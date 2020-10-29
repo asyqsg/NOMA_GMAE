@@ -12,7 +12,7 @@ channel_number: 信道数目
 H: H是用户数目*信道数目的矩阵
 
 """
-
+import sys
 import numpy as np
 
 import Energy_E
@@ -33,15 +33,34 @@ def matching(users_prechannel,user_number:int,channel_number:int,user_list:list,
     ee_list = [0 for i in range(channel_number)]
 
     # 没有匹配的
-    matched = np.zeros([user_number,users_prechannel])
+    matched = np.zeros([channel_number,users_prechannel])
 
 
 
     while unmatched:
         for i in range(user_number):
 
-            max_Hi = max(H[i])
-            choose_channel = H[i].index(max_Hi)
+            # 找到每一个用户（每一行）的最匹配的信道
+            channel_index = np.argmax(H[i])
+            H = H[i][channel_index]
+
+            if users_prechannel != 2:
+                print('完善大与2的情况')
+                sys.exit()
+            else:
+                if matched[channel_index][0] == matched[channel_index][1] == 0:
+                    #此信道为空
+                    matched[channel_index][0] = [H,i] #[H,用户编号]
+                    unmatched.remove(i)
+                elif matched[channel_index][0] != 0 and matched[channel_index][1] ==0:
+                    matched[channel_index][1] = [H,i]
+                    unmatched.remove(i)
+                else:
+                    #此时是信道已经满了，需要根据算法1进行比较
+                    [[H,i]]
+
+
+
 
 
 
