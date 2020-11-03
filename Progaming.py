@@ -7,10 +7,18 @@ import math
 
 import Energy_E
 
+sita = 0.01  #迭代跳出条件
+#迭代次数
+iteration = int(input("输入迭代次数："))
+users_prechannel = int(input("每个子载波上用户数目:"))
+
+
 #算法1  NE for Super-Modular Game
 #这是为了求比例，所以还是不需要总的Pn
 
-def ee_subchannel(H1,H2,Pc,a,Pn):
+
+
+def ee_subchannel(H1,H2,Pc,Pn):
     #初始化功率
 
     P1 = 0
@@ -35,8 +43,8 @@ def ee_subchannel(H1,H2,Pc,a,Pn):
 
         a_list = np.arange(0, 10, 0.01)
         for a in a_list:
-            f1 = (math.log2(1 + P_user * H1)) / (Pc + P_user) - math.e ** (get_a(users_prechannel) * P_user)
-            f2 = (math.log2(1 + (P_user * H2) / (1 + P_user * H2))) / (Pc + P_user) - math.e ** (get_a(users_prechannel) * P_user)
+            f1 = (math.log2(1 + P_user * H1)) / (Pc + P_user) - math.e ** (a * P_user)
+            f2 = (math.log2(1 + (P_user * H2) / (1 + P_user * H2))) / (Pc + P_user) - math.e ** (a* P_user)
             sum_ee = f1 + f2
             if sum_ee > max_ee:
                 max_ee = sum_ee
@@ -46,10 +54,10 @@ def ee_subchannel(H1,H2,Pc,a,Pn):
 
     #能效 f1 and  h2
     def f1(p1,H1):
-        ee_f1 = (math.log2(1 + p1 * H1)) / (Pc + p1) - math.e ** (a * p1)
+        ee_f1 = (math.log2(1 + p1 * H1)) / (Pc + p1) - math.e ** (get_a(users_prechannel) * p1)
         return ee_f1
     def f2(p1,p2,H2):
-        ee_f2 = (math.log2(1 + (p2 * H2) / (1 + p1 * H2))) / (Pc + p2) - math.e ** (a * p2)
+        ee_f2 = (math.log2(1 + (p2 * H2) / (1 + p1 * H2))) / (Pc + p2) - math.e ** (get_a(users_prechannel) * p2)
         return ee_f2
 
 
@@ -94,9 +102,8 @@ def ee_subchannel(H1,H2,Pc,a,Pn):
         else:
             raise ValueError('P1+P2 > Pn rang_P1处')
 
-    #迭代次数
-    iteration = 1000
-    sita = 0.01  #跳出迭代的条件之一
+
+
     k = 0
     pre_p1= 0
     P1_high,P1_low = Pn,0
@@ -119,7 +126,9 @@ def ee_subchannel(H1,H2,Pc,a,Pn):
 
 
 #算法2
-def matching(users_prechannel,user_number:int,channel_number:int,user_list:list,H:np):
+def matching(users_prechannel:int,user_number:int,H:np,Pc,Pn) -> np:
+
+    channel_number = user_number//users_prechannel
 
     # 没有匹配的
     unmatched = [i for i in range(user_number)]
@@ -130,35 +139,81 @@ def matching(users_prechannel,user_number:int,channel_number:int,user_list:list,
     # 没有匹配的
     matched = np.zeros([channel_number,users_prechannel])
 
-
-
     while unmatched:
+        user_list = unmatched
         for i in range(user_number):
+
+            #由于不对动态数字，所以用了两个数组在每次循环后对其添加
+            removed = []
+            add = []
 
             # 找到每一个用户（每一行）的最匹配的信道
             channel_index = np.argmax(H[i])
-            H = H[i][channel_index]
+            H_choose = H[i][channel_index]
 
             if users_prechannel != 2:
-                print('完善每个载波内用户数目大与2的情况')
-                sys.exit()
+                raise Exception('完善大于2用户的情况')
             else:
                 if matched[channel_index][0] == matched[channel_index][1] == 0:
                     #此信道为空
-                    matched[channel_index][0] = [H,i] #[H,用户编号]
-                    unmatched.remove(i)
+                    matched[channel_index][0] = [H_choose,i] #[H,用户编号]
+                    removed.append(i)
                 elif matched[channel_index][0] != 0 and matched[channel_index][1] ==0:
-                    matched[channel_index][1] = [H,i]
-                    unmatched.remove(i)
+                    matched[channel_index][1] = [H_choose,i]
+                    removed.append(i)
                 else:
                     #此时是信道已经满了，需要根据算法1进行比较
                     #将三个用户，三种信道增益放入算法1内，得到最优的用户情况
-                    ChannelAndUsers = [matched[channel_index][0],matched[channel_index][1],[H,i]]
 
-                    #
-                    #
-                    #
-                    #
+                    #have_choosed = [[H,i][H,i]]
+                    have_choosed = [matched[channel_index][0],matched[channel_index][1]]
+
+                    #将出问题的用户标号放入remove列表
+                    removed.append(have_choosed[0][1])
+                    removed.append(have_choosed[1][1])
+
+                    #wantBechoosed - [H,i]
+                    wantBechoosed = [H_choose,i]
+
+                    #group = [[H,i],[H,i]]
+                    group1 = sorted(have_choosed,key=lambda x:x[0],reverse=True)
+                    group2 = [have_choosed[0],wantBechoosed]
+                    group2 = sorted(group2,key=lambda x:x[0],reverse=True)
+                    group3 = [have_choosed[0],wantBechoosed]
+                    group3 = sorted(group3,key=lambda x:x[0],reverse=True)
+
+                    #[[H,i],[],[]]
+                    Gaming = [group1,group2,group3]
+                    Gaming_ee = []
+                    for i in Gaming:
+                        game_ee = ee_subchannel(i[0][0],i[1][0],Pc,Pn)
+                        Gaming_ee.append(game_ee)
+                    max_ee = max(Gaming_ee)
+                    wanted_group = Gaming[Gaming_ee.index(max_ee)]
+
+                    #注意：数据类型可能不同
+                    matched[channel_index] = wanted_group
+
+                    add.append(wanted_group[0][1])
+                    add.append(wanted_group[1][1])
+
+        for i in removed:
+            user_list.remove(i)
+        for i in add:
+            user_list.append(i)
+        user_list.sort()
+        unmatched = user_list
+    return matched
+
+
+#算法3
+# pre_Pn,cur_Pn = 0,1
+#
+# def program_3(Pc,H_matched,Bs,P):
+#     Pn_arange = np.arange(0,P,0.1)
+#     def get_Pn()
+#     k = 0
+#     while k <= iteration and abs(pre_Pn - cur_Pn) > sita:
 
 
 
