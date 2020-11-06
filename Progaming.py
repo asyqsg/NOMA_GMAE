@@ -5,7 +5,7 @@ import sys
 import numpy as np
 import math
 
-import Energy_E
+import Game_Theory
 
 sita = 0.01  #迭代跳出条件
 #迭代次数
